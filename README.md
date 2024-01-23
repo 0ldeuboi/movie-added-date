@@ -1,6 +1,6 @@
 # NFO Date Added Updater
 
-This Python script automatically updates the <dateadded> tag in .nfo files and the <Added> tag to match the <releasedate> in associated movie.xml files for movies in a designated directory.
+This Python script automatically updates the <dateadded> tag in .nfo files and the <Added> tag in associated movie.xml file to match the <releasedate> in the .nfo of the respective film for movies in a designated directory.
 
 ## What it does
 
