@@ -1,6 +1,6 @@
 # NFO Date Added Updater
 
-This script updates the `<dateadded>` tag in .nfo files and `<Added>` tag in movie.xml files for movies stored in a designated directory.
+This script updates the `<dateadded>` tag in .nfo files and `<Added>` tag to match the <releasedate> in movie.xml files for movies stored in a designated directory.
 
 ## What it does
 
