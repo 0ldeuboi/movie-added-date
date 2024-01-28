@@ -193,6 +193,18 @@ def process_directory(directory_path, restore_mode=False):
     for nfo_file in nfo_files:
         nfo_file_path = os.path.join(directory_path, nfo_file)
 
+        # Check if a backup file exists in the directory with correct naming convention for NFO
+        nfo_backup_pattern = re.compile(rf"{re.escape(nfo_file)}\.\d{{4}}-\d{{2}}-\d{{2}}\.bak$")
+        nfo_backup_exists = any(nfo_backup_pattern.match(f) for f in os.listdir(directory_path))
+
+        # Check if a backup file exists in the directory with correct naming convention for XML
+        xml_backup_pattern = re.compile(rf"movie\.xml\.\d{{4}}-\d{{2}}-\d{{2}}\.bak$")
+        xml_backup_exists = any(xml_backup_pattern.match(f) for f in os.listdir(directory_path))
+
+        if nfo_backup_exists or xml_backup_exists:
+            logging.warning(f"Backup file found in {directory_path}. No actions will be taken.")
+            return
+
         if restore_mode:
             restore_file(nfo_file_path, "NFO")
             # Restore corresponding movie.xml file
