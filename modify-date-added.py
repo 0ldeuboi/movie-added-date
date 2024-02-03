@@ -9,8 +9,8 @@ import re
 
 # Constants and Configuration
 CONFIG = {
-    # "DIRECTORY_PATH": "/volume1/EMBY_MEDIA/MOVIES",
-    "DIRECTORY_PATH": "/mnt/w_drive/WORKING_MOVIES",
+    "DIRECTORY_PATH": "/volume1/EMBY_MEDIA/ANIMATED",
+    # "DIRECTORY_PATH": "/mnt/w_drive/WORKING_MOVIES",
 }
 
 LOG_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
@@ -71,18 +71,18 @@ def log_error_and_continue(message, exception=None):
         logging.error(f"Exception: {str(exception)}")
 
 
-def backup_file(file_path, file_type):
+def backup_file(file_path, file_type, skip_if_exists=True):
     try:
         datestamp = datetime.now().strftime("%Y-%m-%d")
         backup_file = f"{file_path}.{datestamp}.bak"
 
-        if os.path.exists(backup_file):
+        if skip_if_exists and os.path.exists(backup_file):
             logging.warning(f"Backup file already exists for {file_type}: {backup_file}")
             return
 
         if os.path.exists(file_path):
             shutil.copy(file_path, backup_file)
-            logging.info(f"Backup created for {file_type}: {backup_file}")  # Include backup file path in log
+            logging.info(f"Backup created for {file_type}: {backup_file}")
         else:
             logging.warning(f"File not found for {file_type} backup: {file_path}")
 
@@ -172,10 +172,14 @@ def update_xml(nfo_file_path):
         logging.warning("Cannot update XML, no release date from NFO")
 
 
-def restore_file(file_path, file_type):
+def restore_file(file_path, file_type, skip_if_exists=True):
     try:
         datestamp = datetime.now().strftime("%Y-%m-%d")
         backup_file = f"{file_path}.{datestamp}.bak"
+
+        if skip_if_exists and os.path.exists(backup_file):
+            logging.warning(f"Skipping restore for {file_type} as backup file already exists: {backup_file}")
+            return
 
         if os.path.exists(backup_file):
             shutil.copy(backup_file, file_path)
@@ -187,38 +191,26 @@ def restore_file(file_path, file_type):
         logging.error(f"Error restoring {file_type}: {e}")
 
 
-def process_directory(directory_path, restore_mode=False):
+def process_directory(directory_path, restore_mode=False, skip_backup_if_exists=True):
     nfo_files = [f for f in os.listdir(directory_path) if f.endswith(".nfo")]
 
     for nfo_file in nfo_files:
         nfo_file_path = os.path.join(directory_path, nfo_file)
 
-        # Check if a backup file exists in the directory with correct naming convention for NFO
-        nfo_backup_pattern = re.compile(rf"{re.escape(nfo_file)}\.\d{{4}}-\d{{2}}-\d{{2}}\.bak$")
-        nfo_backup_exists = any(nfo_backup_pattern.match(f) for f in os.listdir(directory_path))
-
-        # Check if a backup file exists in the directory with correct naming convention for XML
-        xml_backup_pattern = re.compile(rf"movie\.xml\.\d{{4}}-\d{{2}}-\d{{2}}\.bak$")
-        xml_backup_exists = any(xml_backup_pattern.match(f) for f in os.listdir(directory_path))
-
-        if nfo_backup_exists or xml_backup_exists:
-            logging.warning(f"Backup file found in {directory_path}. No actions will be taken.")
-            return
-
         if restore_mode:
-            restore_file(nfo_file_path, "NFO")
+            restore_file(nfo_file_path, "NFO", skip_backup_if_exists)
             # Restore corresponding movie.xml file
             movie_xml_path = os.path.join(directory_path, "movie.xml")
-            restore_file(movie_xml_path, "XML")
+            restore_file(movie_xml_path, "XML", skip_backup_if_exists)
         else:
-            backup_file(nfo_file_path, "NFO")
+            backup_file(nfo_file_path, "NFO", skip_backup_if_exists)
             releasedate_value = update_nfo(nfo_file_path)
 
             if releasedate_value is not None:
                 logging.info(f"NFO file updated: {nfo_file_path}")
                 movie_xml_path = os.path.join(directory_path, "movie.xml")
                 if os.path.exists(movie_xml_path):
-                    backup_file(movie_xml_path, "XML")
+                    backup_file(movie_xml_path, "XML", skip_backup_if_exists)
                     update_xml(nfo_file_path)
 
 
@@ -237,22 +229,26 @@ def main():
                 print("Usage:")
                 print("  python date-added.py - Display this help menu")
                 print("  python date-added.py run - Run the script")
+                print("  python date-added.py run force - Run the script and force backups")
                 print("  python date-added.py restore - Restore from backup")
             elif sys.argv[1] == "run":
                 restore_mode = False
+                force_backup = "force" in sys.argv[2:]
             elif sys.argv[1] == "restore":
                 restore_mode = True
+                force_backup = False
             else:
                 print("Usage:")
                 print("  python date-added.py - Display this help menu")
                 print("  python date-added.py run - Run the script")
+                print("  python date-added.py run force - Run the script and force backups")
                 print("  python date-added.py restore - Restore from backup")
                 sys.exit(1)
 
             for subdir in os.scandir(CONFIG["DIRECTORY_PATH"]):
                 if subdir.is_dir():
-                    process_directory(subdir.path, restore_mode)
-                    
+                    process_directory(subdir.path, restore_mode, force_backup)
+
             if restore_mode:
                 logging.warning("Restore mode enabled. Files have been restored from backups.")
                 logging.warning("Please review the restored files to ensure data integrity.")
@@ -263,6 +259,7 @@ def main():
             print("Usage:")
             print("  python date-added.py - Display this help menu")
             print("  python date-added.py run - Run the script")
+            print("  python date-added.py run force - Run the script and force backups")
             print("  python date-added.py restore - Restore from backup")
 
     except Exception as e:
