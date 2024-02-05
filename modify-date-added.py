@@ -95,11 +95,11 @@ def update_nfo(nfo_file_path):
         with open(nfo_file_path, "r", encoding="utf-8") as f:
             nfo_content = f.read()
 
+        # Update <dateadded>
         dateadded_pattern = r"<dateadded>(.*?)</dateadded>"
         match_dateadded = re.search(dateadded_pattern, nfo_content)
 
         if match_dateadded is None:
-            # If <dateadded> tag doesn't exist, find <title> tag
             match_title = re.search(r"<title>(.*?)</title>", nfo_content)
             if match_title:
                 title_tag = match_title.group(0)
@@ -124,15 +124,7 @@ def update_nfo(nfo_file_path):
 
         new_dateadded_value = f"<dateadded>{releasedate_value} 13:52:00</dateadded>"
 
-        nfo_content_updated = re.sub(dateadded_pattern, new_dateadded_value, nfo_content)
-        with open(nfo_file_path, "w", encoding="utf-8") as f:
-            f.write(nfo_content_updated)
-
-        # Move this log statement outside the try block
-        return releasedate_value
-
-        # Existing code for <dateadded> if <mpaa> doesn't need updating
-
+        # Update <mpaa>
         mpaa_pattern = r"<mpaa>(.*?)</mpaa>"
         match_mpaa = re.search(mpaa_pattern, nfo_content)
 
@@ -142,12 +134,13 @@ def update_nfo(nfo_file_path):
             # Add logic to map different MPAA ratings to "PG-13"
             if current_mpaa == "12A" or current_mpaa == "15" or current_mpaa == "12":
                 new_mpaa_value = "PG-13"
-                nfo_content_updated = re.sub(mpaa_pattern, f"<mpaa>{new_mpaa_value}</mpaa>", nfo_content)
-                with open(nfo_file_path, "w", encoding="utf-8") as f:
-                    f.write(nfo_content_updated)
-                return new_mpaa_value
+                nfo_content = re.sub(mpaa_pattern, f"<mpaa>{new_mpaa_value}</mpaa>", nfo_content)
 
-        # Existing code for <dateadded> if <mpaa> doesn't need updating
+        # Write the modified content to the file
+        with open(nfo_file_path, "w", encoding="utf-8") as f:
+            f.write(nfo_content)
+
+        return releasedate_value  
 
     except Exception as e:
         log_error_and_continue(f"Error updating NFO file {nfo_file_path}: {e}")
@@ -212,25 +205,41 @@ def restore_file(file_path, file_type, skip_if_exists=True):
 
 def process_directory(directory_path, restore_mode=False, skip_backup_if_exists=True):
     nfo_files = [f for f in os.listdir(directory_path) if f.endswith(".nfo")]
+    total_files = len(nfo_files)
+    processed_files = 0
 
     for nfo_file in nfo_files:
         nfo_file_path = os.path.join(directory_path, nfo_file)
 
-        if restore_mode:
-            restore_file(nfo_file_path, "NFO", skip_backup_if_exists)
-            # Restore corresponding movie.xml file
-            movie_xml_path = os.path.join(directory_path, "movie.xml")
-            restore_file(movie_xml_path, "XML", skip_backup_if_exists)
-        else:
-            backup_file(nfo_file_path, "NFO", skip_backup_if_exists)
-            releasedate_value = update_nfo(nfo_file_path)
-
-            if releasedate_value is not None:
-                logging.info(f"NFO file updated: {nfo_file_path}")
+        try:
+            if restore_mode:
+                restore_file(nfo_file_path, "NFO", skip_backup_if_exists)
+                # Restore corresponding movie.xml file
                 movie_xml_path = os.path.join(directory_path, "movie.xml")
-                if os.path.exists(movie_xml_path):
-                    backup_file(movie_xml_path, "XML", skip_backup_if_exists)
-                    update_xml(nfo_file_path)
+                restore_file(movie_xml_path, "XML", skip_backup_if_exists)
+            else:
+                backup_file(nfo_file_path, "NFO", skip_backup_if_exists)
+                releasedate_value = update_nfo(nfo_file_path)
+
+                if releasedate_value is not None:
+                    message = f"Processing: NFO file updated: {nfo_file_path}"
+                    print(message)
+                    logging.debug(message)
+                    movie_xml_path = os.path.join(directory_path, "movie.xml")
+                    if os.path.exists(movie_xml_path):
+                        backup_file(movie_xml_path, "XML", skip_backup_if_exists)
+                        update_xml(nfo_file_path)
+
+            processed_files += 1
+            progress_message = f"Processing: Progress: {processed_files}/{total_files}"
+            print(progress_message)
+            logging.debug(progress_message)
+        except Exception as e:
+            error_message = f"Processing: Error processing {nfo_file}: {e}"
+            print(error_message)
+            logging.error(error_message)
+
+    logging.info("Processing complete.")
 
 
 def main():
