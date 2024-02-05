@@ -109,6 +109,7 @@ def update_nfo(nfo_file_path):
                 log_error_and_continue(f"Error: <title> tag not found in NFO file {nfo_file_path}")
                 return None
 
+        # Existing code for updating <dateadded>
         releasedate_pattern = r"<releasedate>(.*?)</releasedate>"
         match_releasedate = re.search(releasedate_pattern, nfo_content)
         if match_releasedate:
@@ -129,6 +130,24 @@ def update_nfo(nfo_file_path):
 
         # Move this log statement outside the try block
         return releasedate_value
+
+        # Existing code for <dateadded> if <mpaa> doesn't need updating
+
+        mpaa_pattern = r"<mpaa>(.*?)</mpaa>"
+        match_mpaa = re.search(mpaa_pattern, nfo_content)
+
+        if match_mpaa:
+            current_mpaa = match_mpaa.group(1)
+
+            # Add logic to map different MPAA ratings to "PG-13"
+            if current_mpaa == "12A" or current_mpaa == "15" or current_mpaa == "12":
+                new_mpaa_value = "PG-13"
+                nfo_content_updated = re.sub(mpaa_pattern, f"<mpaa>{new_mpaa_value}</mpaa>", nfo_content)
+                with open(nfo_file_path, "w", encoding="utf-8") as f:
+                    f.write(nfo_content_updated)
+                return new_mpaa_value
+
+        # Existing code for <dateadded> if <mpaa> doesn't need updating
 
     except Exception as e:
         log_error_and_continue(f"Error updating NFO file {nfo_file_path}: {e}")
